@@ -17,6 +17,13 @@ const styles = {
     justifyContent: "center",
     alignItems: "center"
   },
+  containerButton: {
+    flexDirection: "row",
+    flex: 1,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center"
+  },
   animated: {
     borderWidth: 0,
     position: "absolute"
@@ -27,35 +34,66 @@ export default class SwitchSelector extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      selected: this.props.initial
+      selected: this.props.initial ? this.props.initial : 0
     };
+    this.animatedValue = new Animated.Value(
+        this.props.initial
+            ? I18nManager.isRTL
+            ? -(this.props.initial / this.props.options.length)
+            : this.props.initial / this.props.options.length
+            : 0
+    );
+  }
 
+  componentWillMount() {
+    this.toggleItem(this.props.selected-1)
+    this.setState({selected: this.props.selected-1})
     this._panResponder = PanResponder.create({
       onStartShouldSetPanResponder: this.shouldSetResponder,
       onMoveShouldSetPanResponder: this.shouldSetResponder,
       onPanResponderRelease: this.responderEnd,
       onPanResponderTerminate: this.responderEnd
     });
-
-    this.animatedValue = new Animated.Value(
-      this.props.initial
-        ? I18nManager.isRTL
-          ? -(this.props.initial / this.props.options.length)
-          : this.props.initial / this.props.options.length
-        : 0
-    );
   }
 
-  componentDidUpdate(prevProps) {
-    if (prevProps.value !== this.props.value) {
-      this.toggleItem(this.props.value, !this.props.disableValueChangeOnPress);
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    try{
+      if( (prevState.selected !== this.state.selected) ) {
+        if(this.props.selected <= this.props.options.length){
+          this.toggleItem(this.state.selected)
+          return;
+        }
+      }
+      if( (prevProps.selected !== this.props.selected) ){
+        this.toggleItem(this.props.selected-1)
+        this.setState({selected: this.props.selected-1})
+        return;
+      }
+
+
+
+    } catch (e) {
+      console.error(e);
     }
+
+  }
+
+  componentWillReceiveProps(nextProps) {
+    try{
+      if (nextProps.value !== this.props.value) {
+        this.toggleItem(nextProps.value, !this.props.disableValueChangeOnPress);
+      }
+    }catch (e) {
+      console.error(e)
+    }
+
   }
 
   shouldSetResponder = (evt, gestureState) => {
     return (
-      evt.nativeEvent.touches.length === 1 &&
-      !(Math.abs(gestureState.dx) < 5 && Math.abs(gestureState.dy) < 5)
+        evt.nativeEvent.touches.length === 1 &&
+        !(Math.abs(gestureState.dx) < 5 && Math.abs(gestureState.dy) < 5)
     );
   };
 
@@ -63,8 +101,8 @@ export default class SwitchSelector extends Component {
     if (this.props.disabled) return;
     const swipeDirection = this._getSwipeDirection(gestureState);
     if (
-      swipeDirection === "RIGHT" &&
-      this.state.selected < this.props.options.length - 1
+        swipeDirection === "RIGHT" &&
+        this.state.selected < this.props.options.length - 1
     ) {
       this.toggleItem(this.state.selected + 1);
     } else if (swipeDirection === "LEFT" && this.state.selected > 0) {
@@ -84,9 +122,7 @@ export default class SwitchSelector extends Component {
   getBgColor() {
     const { selected } = this.state;
     const { options, buttonColor } = this.props;
-    if (selected === -1) {
-      return "transparent";
-    }
+    if(options[selected] == null)  return 'white';
     return options[selected].activeColor || buttonColor;
   }
 
@@ -100,21 +136,28 @@ export default class SwitchSelector extends Component {
     }).start();
   };
 
+
+
   toggleItem = (index, callOnPress = true) => {
-    const { options, returnObject, onPress } = this.props;
-    if (options.length <= 1 || index === null || isNaN(index)) return;
-    this.animate(
-      I18nManager.isRTL ? -(index / options.length) : index / options.length,
-      I18nManager.isRTL
-        ? -(this.state.selected / options.length)
-        : this.state.selected / options.length
-    );
-    if (callOnPress && onPress) {
-      onPress(returnObject ? options[index] : options[index].value);
-    } else {
-      console.log("Call onPress with value: ", options[index].value);
+    try{
+      const { options, returnObject, onPress } = this.props;
+      if (options.length <= 1 || index == null || (index === -1) || isNaN(index) ) return;
+      this.animate(
+          I18nManager.isRTL ? -(index / options.length) : index / options.length,
+          I18nManager.isRTL
+              ? -(this.state.selected / options.length)
+              : this.state.selected / options.length
+      );
+      if (callOnPress && onPress) {
+        onPress(returnObject ? options[index] : options[index].value);
+      } else {
+        console.log("Call onPress with value: ", options[index].value);
+      }
+      this.setState({ selected: index });
+    } catch (e) {
+      console.error(e);
     }
-    this.setState({ selected: index });
+
   };
 
   render() {
@@ -122,8 +165,6 @@ export default class SwitchSelector extends Component {
       style,
       textStyle,
       selectedTextStyle,
-      textContainerStyle,
-      selectedTextContainerStyle,
       imageStyle,
       textColor,
       selectedColor,
@@ -135,114 +176,109 @@ export default class SwitchSelector extends Component {
       valuePadding,
       height,
       bold,
-      disabled,
-      buttonMargin
+      disabled
     } = this.props;
 
-    const options = this.props.options.map((element, index) => {
-      const is_selected = this.state.selected == index;
-
-      return (
+    const options = this.props.options.map((element, index) => (
         <TouchableOpacity
-          key={index}
-          disabled={disabled}
-          style={[styles.button, is_selected ? selectedTextContainerStyle : textContainerStyle]}
-          onPress={() => this.toggleItem(index)}
-        >
-          {typeof element.customIcon === "function"
-            ? element.customIcon(is_selected)
-            : element.customIcon}
-          {element.imageIcon && (
-            <Image
-              source={element.imageIcon}
-              style={[
-                {
-                  height: 30,
-                  width: 30,
-                  tintColor:
-                    is_selected ? selectedColor : textColor
-                },
-                imageStyle
-              ]}
-            />
-          )}
-          <Text
-            style={[
-              {
-                fontSize,
-                fontWeight: bold ? "bold" : "normal",
-                textAlign: "center",
-                color: is_selected ? selectedColor : textColor,
-                backgroundColor: "transparent"
-              },
-              is_selected ? selectedTextStyle : textStyle
-            ]}
-          >
-            {element.label}
-          </Text>
-        </TouchableOpacity>
-      )
-    });
+    key={index}
+    disabled={disabled}
+    style={styles.button}
+    onPress={() => this.toggleItem(index)}
+  >
+    {typeof element.customIcon === "function"
+        ? element.customIcon(this.state.selected == index)
+        : element.customIcon}
+    {element.imageIcon && (
+    <Image
+      source={element.imageIcon}
+      style={[
+            {
+              height: 30,
+              width: 30,
+              tintColor:
+                  this.state.selected == index ? selectedColor : textColor
+            },
+        imageStyle
+    ]}
+      />
+    )}
+  <Text
+    style={[
+          {
+            fontSize,
+            fontWeight: bold ? "bold" : "normal",
+            textAlign: "center",
+            color: this.state.selected == index ? selectedColor : textColor,
+            backgroundColor: "transparent"
+          },
+      this.state.selected == index ? selectedTextStyle : textStyle
+  ]}
+  >
+    {element.label}
+  </Text>
+    </TouchableOpacity>
+  ));
 
     return (
-      <View style={[{ flexDirection: "row" }, style]}>
-        <View {...this._panResponder.panHandlers} style={{ flex: 1 }}>
-          <View
-            style={{
+        <View style={[{ flexDirection: "row" }, style]}>
+  <View {...this._panResponder.panHandlers} style={{ flex: 1 }}>
+  <View
+    style={{
+      borderRadius: borderRadius,
+          backgroundColor: backgroundColor,
+          height
+    }}
+    onLayout={event => {
+      const { width } = event.nativeEvent.layout;
+      this.setState({
+        sliderWidth: width - (hasPadding ? 2 : 0)
+      });
+    }}
+  >
+  <View
+    style={{
+      flex: 1,
+          flexDirection: "row",
+          borderColor: borderColor || "#c9c9c9",
+          borderRadius: borderRadius,
+          borderWidth: hasPadding ? 1 : 0
+    }}
+  >
+    {!!this.state.sliderWidth && (
+    <Animated.View
+      style={[
+            {
+              height: hasPadding ? height - 4 : height,
+              backgroundColor: this.getBgColor(),
+              width:
+                  this.state.sliderWidth / this.props.options.length -
+                  (hasPadding ? valuePadding : 0),
+              transform: [
+                {
+                  translateX: this.animatedValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [
+                      hasPadding ? valuePadding : 0,
+                      this.state.sliderWidth -
+                      (hasPadding ? valuePadding : 0)
+                    ]
+                  })
+                }
+              ],
               borderRadius: borderRadius,
-              backgroundColor: backgroundColor,
-              height: height + (buttonMargin * 2)
-            }}
-            onLayout={event => {
-              const { width } = event.nativeEvent.layout;
-              this.setState({
-                sliderWidth: width - (hasPadding ? 2 : 0)
-              });
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                borderColor: borderColor,
-                borderRadius: borderRadius,
-                borderWidth: hasPadding ? 1 : 0
-              }}
-            >
-              {!!this.state.sliderWidth && (
-                <Animated.View
-                  style={[
-                    {
-                      height: hasPadding ? height - 4 : height,
-                      backgroundColor: this.getBgColor(),
-                      width:
-                        this.state.sliderWidth / this.props.options.length -
-                        ((hasPadding ? valuePadding : 0) + (buttonMargin * 2)),
-                      transform: [
-                        {
-                          translateX: this.animatedValue.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [
-                              hasPadding ? valuePadding : 0,
-                              this.state.sliderWidth -
-                              (hasPadding ? valuePadding : 0)
-                            ]
-                          })
-                        }
-                      ],
-                      borderRadius: borderRadius,
-                      margin: buttonMargin
-                    },
-                    styles.animated
-                  ]}
-                />
-              )}
-              {options}
-            </View>
-          </View>
-        </View>
-      </View>
-    );
+              marginTop: hasPadding ? valuePadding : 0
+            },
+        styles.animated
+    ]}
+      />
+    )}
+    {options}
+  </View>
+    </View>
+    </View>
+    </View>
+  );
   }
 }
 
@@ -250,8 +286,6 @@ SwitchSelector.defaultProps = {
   style: {},
   textStyle: {},
   selectedTextStyle: {},
-  textContainerStyle: {},
-  selectedTextContainerStyle: {},
   imageStyle: {},
   textColor: "#000000",
   selectedColor: "#FFFFFF",
@@ -263,11 +297,9 @@ SwitchSelector.defaultProps = {
   valuePadding: 1,
   height: 40,
   bold: false,
-  buttonMargin: 0,
   buttonColor: "#BCD635",
   returnObject: false,
   animationDuration: 100,
   disabled: false,
-  disableValueChangeOnPress: false,
-  initial: -1
+  disableValueChangeOnPress: false
 };
