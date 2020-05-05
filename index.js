@@ -45,7 +45,7 @@ export default class SwitchSelector extends Component {
     );
   }
 
-  componentWillMount() {
+  componentDidMount() {
     this.toggleItem(this.props.selected-1)
     this.setState({selected: this.props.selected-1})
     this._panResponder = PanResponder.create({
@@ -79,10 +79,10 @@ export default class SwitchSelector extends Component {
 
   }
 
-  componentWillReceiveProps(nextProps) {
+  getDerivedStateFromProps(nextProps) {
     try{
       if (nextProps.value !== this.props.value) {
-        this.toggleItem(nextProps.value, !this.props.disableValueChangeOnPress);
+        return this.toggleItem(nextProps.value, !this.props.disableValueChangeOnPress);
       }
     }catch (e) {
       console.error(e)
@@ -154,6 +154,7 @@ export default class SwitchSelector extends Component {
         console.log("Call onPress with value: ", options[index].value);
       }
       this.setState({ selected: index });
+      return {selected: index};
     } catch (e) {
       console.error(e);
     }
